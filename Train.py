@@ -66,10 +66,9 @@ def train(model, device, train_loader, optimizer, epoch):  # Train the model
 
             optimizer.step()
             # if (batch_idx + 1) % 100 == 0:  # Print the loss
-            msg = 'Train Epoch: {} [{}/{} ({:.2f}%)]/t Loss: {:.6f}'.format(epoch, (batch_idx + 1) * len(x1),
-                                                                                len(train_loader.dataset),
-                                                                                100. * batch_idx / len(train_loader),
-                                                                                loss.item())  # Remember to use loss.item()
+            msg = 'Train Epoch: {} [{}/{} ({:.2f}%)]\t Loss: {:.6f}\t Time: {:.2f}s'.format(
+                epoch, (batch_idx + 1) * len(x1), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.item(), time.time() - start_time)
             print(msg)
             write_log(msg)
 
@@ -88,10 +87,9 @@ def train(model, device, train_loader, optimizer, epoch):  # Train the model
 
             optimizer.step()
             # if (batch_idx + 1) % 100 == 0:  # Print the loss
-            msg = 'Train Epoch: {} [{}/{} ({:.2f}%)]/t Loss: {:.6f}'.format(epoch, (batch_idx + 1) * len(x1),
-                                                                                len(train_loader.dataset),
-                                                                                100. * batch_idx / len(train_loader),
-                                                                                loss.item())  # Remember to use loss.item()
+            msg = 'Train Epoch: {} [{}/{} ({:.2f}%)]\t Loss: {:.6f}\t Time: {:.2f}s'.format(
+                epoch, (batch_idx + 1) * len(x1), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.item(), time.time() - start_time)
             print(msg)
             write_log(msg)
         
