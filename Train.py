@@ -257,16 +257,17 @@ def main():
 
     best_acc = 0.0
     NUM_EPOCHS = 3
-    if IS_CHARBERT:
-        PATH = './charbert_model_epoch_{epoch}.pth'
-    else:
-        PATH = './bert_model_epoch_{epoch}.pth'
     for epoch in range(1, NUM_EPOCHS + 1):  # 3 epochs
         train(model, DEVICE, train_loader, optimizer, epoch)
         acc, precision, recall, f1 = validation(model, DEVICE, val_loader, epoch)
         if best_acc < acc:
             best_acc = acc
-            torch.save(model.state_dict(), PATH)  # Save the best model
+            
+        if IS_CHARBERT:
+            PATH = f'./charbert_model_epoch_{epoch}.pth'
+        else:
+            PATH = f'./bert_model_epoch_{epoch}.pth'
+        torch.save(model.state_dict(), PATH)  # Save the best model
         print("acc is: {:.4f}, best acc is {:.4f}n".format(acc, best_acc))
 
 if __name__ == '__main__':

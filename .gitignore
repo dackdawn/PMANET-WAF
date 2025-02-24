@@ -173,6 +173,8 @@ benign_urls.txt
 confusion_matrix*.png
 malware_urls.txt
 model*.pth
+charbert_model*.pth
+bert_model*.pth
 results*.txt
 roc_curve*.png
 character_bert_wiki/pytorch_model.bin
