@@ -146,6 +146,10 @@ def main():
                                 torch.tensor(input_types).to(DEVICE),
                                 torch.tensor(input_masks).to(DEVICE),
                                 torch.tensor(label).to(DEVICE))
+    
+    # Trim the dataset to be a multiple of BATCH_SIZE
+    trim_length = (len(test_data) // BATCH_SIZE) * BATCH_SIZE
+    test_data.tensors = tuple(tensor[:trim_length] for tensor in test_data.tensors)
     test_sampler = SequentialSampler(test_data)
     test_loader = DataLoader(test_data, sampler=test_sampler, batch_size=BATCH_SIZE)
     
