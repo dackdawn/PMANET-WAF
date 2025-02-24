@@ -169,9 +169,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-benign_urls.txt
+benign_urls*.txt
 confusion_matrix*.png
-malware_urls.txt
+malware_urls*.txt
 model*.pth
 charbert_model*.pth
 bert_model*.pth
@@ -184,3 +184,4 @@ slurm/lzp-slurm-pmanet.tar
 slurm/lzp-slurm-pmanet.sif
 Data/**/*.pt
 *.pt
+log_want.txt
