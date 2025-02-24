@@ -161,15 +161,13 @@ def main():
         # 保存到本地
         torch.save(test_data, test_data_file)
     
-    # Trim the dataset to be a multiple of BATCH_SIZE
-    trim_length = (len(test_data) // BATCH_SIZE) * BATCH_SIZE
-    test_data.tensors = tuple(tensor[:trim_length] for tensor in test_data.tensors)
-    test_sampler = SequentialSampler(test_data)
-    test_loader = DataLoader(test_data, sampler=test_sampler, batch_size=BATCH_SIZE)
+    # test_sampler = SequentialSampler(test_data)
+    # batch_sampler = BatchSampler(test_sampler, batch_size=BATCH_SIZE, drop_last=True)
+    test_loader = DataLoader(test_data, batch_size=BATCH_SIZE, drop_last=True)
     
     # Load the pre-trained model
 
-    model_name = "./model_epoch_1.pth"
+    model_name = "model_epoch_1.pth"
 
     if IS_CHARBERT:
         model = CharBertModel().to(DEVICE)
