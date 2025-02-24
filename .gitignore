@@ -183,3 +183,4 @@ charbert-bert-wiki/pytorch_model.bin
 slurm/lzp-slurm-pmanet.tar
 slurm/lzp-slurm-pmanet.sif
 Data/**/*.pt
+*.pt

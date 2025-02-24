@@ -1,0 +1,16 @@
+# 这个是基于Slurm集群的环境
+
+# 基于 continuumio/anaconda3:main 镜像，已包含 Conda 和 Python (Anaconda)
+FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+
+# 切换到 bash shell (可选，更方便交互式操作)
+SHELL ["/bin/bash", "-c"]
+
+# 安装 依赖
+RUN pip install scikit-learn matplotlib seaborn pytorch-pretrained-bert transformers==4.46.3
+
+# 设置工作目录 (可选)
+# WORKDIR /app
+
+# 定义启动命令 (可选，根据你的实际应用场景设置)
+# CMD ["/bin/bash"]

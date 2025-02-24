@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn.functional as F
 from torch.utils.data import *
@@ -176,70 +177,97 @@ def validation(model, device, test_loader, epoch=0):
 
 
 def main():
-    input_ids = []  # input char ids
-    input_types = []  # segment ids
-    input_masks = []  # attention mask
-    label = []  
-    char_ids = []
-    start_ids = []
-    end_ids = []
+    
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if IS_CHARBERT:
-        dataPreprocess_charbert("benign_urls.txt", input_ids, input_types, input_masks, char_ids, start_ids, end_ids, label, 0)
-        dataPreprocess_charbert("malware_urls.txt", input_ids, input_types, input_masks, char_ids, start_ids, end_ids, label, 1)
-        input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val,char_ids_val,start_ids_val, end_ids_val, y_val = spiltDatast_charbert(
-                input_ids, input_types, input_masks,char_ids,start_ids ,end_ids,label)
-        print(input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val,char_ids_val,start_ids_val, end_ids_val, y_val)
-    elif not IS_CHARBERT:
-        dataPreprocess_bert("benign_urls.txt", input_ids, input_types, input_masks, label, 0)
-        dataPreprocess_bert("malware_urls.txt", input_ids, input_types, input_masks, label, 1)
-        input_ids_train, input_types_train, input_masks_train, y_train, input_ids_val, input_types_val, input_masks_val, y_val = spiltDatast_bert(
-            input_ids, input_types, input_masks, label
-        )
-
-    """
-       input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val,char_ids_val,start_ids_val, end_ids_val, y_val = spiltDatast_charbert(
-            input_ids, input_types, input_masks,char_ids,start_ids ,end_ids,label)
-    """
-    # Load data into efficient DataLoaders
     BATCH_SIZE = 8
-           
+    
     if IS_CHARBERT:
-        # charbert版本的
-        train_data = TensorDataset(torch.tensor(input_ids_train).to(DEVICE),
-                                    torch.tensor(input_types_train).to(DEVICE),
-                                    torch.tensor(input_masks_train).to(DEVICE),
-                                    torch.tensor(char_ids_train).to(DEVICE),
-                                    torch.tensor(start_ids_train).to(DEVICE),
-                                    torch.tensor(end_ids_train).to(DEVICE),
-                                    torch.tensor(y_train).to(DEVICE))
-    elif not IS_CHARBERT:
-        train_data = TensorDataset(torch.tensor(input_ids_train).to(DEVICE),
-                                    torch.tensor(input_types_train).to(DEVICE),
-                                    torch.tensor(input_masks_train).to(DEVICE),
-                                    torch.tensor(y_train).to(DEVICE))
+        base_data_file = "_data_charbert.pt"
+    else:
+        base_data_file = "_data_base.pt"
+    
+    # 如果任何一个不存在，则需要重新生成数据
+    if not os.path.exists(f'train{base_data_file}') or not os.path.exists(f'val{base_data_file}'):
+        # 删除pt文件
+        if os.path.exists(f'train{base_data_file}'):
+            os.remove(f'train{base_data_file}')
+        if os.path.exists(f'val{base_data_file}'):
+            os.remove(f'val{base_data_file}')
+
+        input_ids = []  # input char ids
+        input_types = []  # segment ids
+        input_masks = []  # attention mask
+        label = []  
+        char_ids = []
+        start_ids = []
+        end_ids = []
+        if IS_CHARBERT:
+            dataPreprocess_charbert("benign_urls.txt", input_ids, input_types, input_masks, char_ids, start_ids, end_ids, label, 0)
+            dataPreprocess_charbert("malware_urls.txt", input_ids, input_types, input_masks, char_ids, start_ids, end_ids, label, 1)
+            input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val,char_ids_val,start_ids_val, end_ids_val, y_val = spiltDatast_charbert(
+                    input_ids, input_types, input_masks,char_ids,start_ids ,end_ids,label)
+            # print(input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val,char_ids_val,start_ids_val, end_ids_val, y_val)
+        else:
+            dataPreprocess_bert("benign_urls.txt", input_ids, input_types, input_masks, label, 0)
+            dataPreprocess_bert("malware_urls.txt", input_ids, input_types, input_masks, label, 1)
+            input_ids_train, input_types_train, input_masks_train, y_train, input_ids_val, input_types_val, input_masks_val, y_val = spiltDatast_bert(
+                input_ids, input_types, input_masks, label
+            )
+
+
+    # 加载训练数据集
+    if os.path.exists(f'train{base_data_file}'):
+        train_data = torch.load(f'train{base_data_file}')
+        print("train data loaded from file.")
+    else:
+        # Load data into efficient DataLoaders
+        if IS_CHARBERT:
+            # charbert版本的
+            train_data = TensorDataset(torch.tensor(input_ids_train).to(DEVICE),
+                                        torch.tensor(input_types_train).to(DEVICE),
+                                        torch.tensor(input_masks_train).to(DEVICE),
+                                        torch.tensor(char_ids_train).to(DEVICE),
+                                        torch.tensor(start_ids_train).to(DEVICE),
+                                        torch.tensor(end_ids_train).to(DEVICE),
+                                        torch.tensor(y_train).to(DEVICE))
+        elif not IS_CHARBERT:
+            train_data = TensorDataset(torch.tensor(input_ids_train).to(DEVICE),
+                                        torch.tensor(input_types_train).to(DEVICE),
+                                        torch.tensor(input_masks_train).to(DEVICE),
+                                        torch.tensor(y_train).to(DEVICE))
+
+        # 保存到本地
+        torch.save(train_data, f'train{base_data_file}')
 
     train_sampler = RandomSampler(train_data)
-    train_loader = DataLoader(train_data, sampler=train_sampler, batch_size=BATCH_SIZE)
+    train_loader = DataLoader(train_data, sampler=train_sampler, batch_size=BATCH_SIZE, drop_last=True)
 
-    if IS_CHARBERT:
-        # charbert版本的
-        val_data = TensorDataset(torch.tensor(input_ids_val).to(DEVICE),
-                                    torch.tensor(input_types_val).to(DEVICE),
-                                    torch.tensor(input_masks_val).to(DEVICE),
-                                    torch.tensor(char_ids_val).to(DEVICE),
-                                    torch.tensor(start_ids_val).to(DEVICE),
-                                    torch.tensor(end_ids_val).to(DEVICE),
-                                    torch.tensor(y_val).to(DEVICE))
-    elif not IS_CHARBERT:
-        val_data = TensorDataset(torch.tensor(input_ids_val).to(DEVICE),
-        torch.tensor(input_types_val).to(DEVICE),
-        torch.tensor(input_masks_val).to(DEVICE),
-        torch.tensor(y_val).to(DEVICE))
-    
+    # 加载测试数据集
+    if os.path.exists(f'val{base_data_file}'):
+        val_data = torch.load(f'val{base_data_file}')
+        print("val data loaded from file.")
+    else:
+        if IS_CHARBERT:
+            # charbert版本的
+            val_data = TensorDataset(torch.tensor(input_ids_val).to(DEVICE),
+                                        torch.tensor(input_types_val).to(DEVICE),
+                                        torch.tensor(input_masks_val).to(DEVICE),
+                                        torch.tensor(char_ids_val).to(DEVICE),
+                                        torch.tensor(start_ids_val).to(DEVICE),
+                                        torch.tensor(end_ids_val).to(DEVICE),
+                                        torch.tensor(y_val).to(DEVICE))
+        elif not IS_CHARBERT:
+            val_data = TensorDataset(torch.tensor(input_ids_val).to(DEVICE),
+            torch.tensor(input_types_val).to(DEVICE),
+            torch.tensor(input_masks_val).to(DEVICE),
+            torch.tensor(y_val).to(DEVICE))
+        
+        # 保存到本地
+        torch.save(val_data, f'val{base_data_file}')
+        
     val_sampler = SequentialSampler(val_data)
-    val_loader = DataLoader(val_data, sampler=val_sampler, batch_size=BATCH_SIZE)
+    val_loader = DataLoader(val_data, sampler=val_sampler, batch_size=BATCH_SIZE, drop_last=True)
     
     if IS_CHARBERT:
         model = CharBertModel()
