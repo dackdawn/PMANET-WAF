@@ -30,7 +30,9 @@ def test_binary(model, device, test_loader, output_name):
     
     start_time = time.time()
     if IS_CHARBERT:
+        i = 0
         for batch_idx, (x1, x2, x3, x4, x5, x6, y) in enumerate(test_loader):
+            i += 1
             x1, x2, x3, x4, x5, x6, y = x1.to(device), x2.to(device), x3.to(device), x4.to(device), x5.to(device), x6.to(device), y.to(device)
             with torch.no_grad():
                 outputs, pooled, y_ = model([x1, x2, x3, x4, x5, x6])
@@ -39,13 +41,15 @@ def test_binary(model, device, test_loader, output_name):
             y_true.extend(y.cpu().numpy())
             y_pred.extend(pred.cpu().numpy())
             y_probs.extend(torch.softmax(y_, dim=1).cpu().numpy()[:, 1])  # Save predicted probabilities
-            if batch_idx % 100 == 0:
+            if i % 100 == 0:
                 print(f'Batch {(batch_idx + 1) * len(x1)}/{len(test_loader.dataset)}, '
                     f'{100. * batch_idx / len(test_loader):.2f}%, Loss: {test_loss:.4f}, '
                     f'Time: {time.time() - start_time:.2f}s')
                 start_time = time.time()
     else:
+        i = 0
         for batch_idx, (x1, x2, x3, y) in enumerate(test_loader):
+            i += 1
             x1, x2, x3, y = x1.to(device), x2.to(device), x3.to(device), y.to(device)
             with torch.no_grad():
                 outputs, pooled, y_ = model([x1, x2, x3])
@@ -55,7 +59,7 @@ def test_binary(model, device, test_loader, output_name):
             y_true.extend(y.cpu().numpy())
             y_pred.extend(pred.cpu().numpy())
             y_probs.extend(torch.softmax(y_, dim=1).cpu().numpy()[:, 1])  # Save predicted probabilities
-            if batch_idx % 100 == 0:
+            if i % 100 == 0:
                 print(f'Batch {(batch_idx + 1) * len(x1)}/{len(test_loader.dataset)}, '
                     f'{100. * batch_idx / len(test_loader):.2f}%, Loss: {test_loss:.4f}, '
                     f'Time: {time.time() - start_time:.2f}s')
@@ -167,7 +171,7 @@ def main():
     
     # Load the pre-trained model
 
-    model_name = "model_epoch_1.pth"
+    model_name = "model_epoch_7.pth"
 
     if IS_CHARBERT:
         model = CharBertModel().to(DEVICE)
