@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn.functional as F
 from torch.utils.data import *
@@ -114,38 +115,51 @@ def main():
     end_ids = []  # end ids
     label = []  # Labels
 
+    BATCH_SIZE = 8
+
     dataset = "Data/Multiple_dataset/kaggle_multi.csv"
     if IS_CHARBERT:
-        char_ids, start_ids, end_ids = dataPreprocessFromCSV(dataset, input_ids, input_types, input_masks, label, IS_CHARBERT, True)
+        test_data_file = "Data/Multiple_dataset/kaggle_multi_charbert.pt"
     else:
-        dataPreprocessFromCSV(dataset, input_ids, input_types, input_masks, label, IS_CHARBERT, True)
-    print("load finish")
-    # Ensure all input arrays have the same length
-    # min_length = min(len(input_ids), len(input_types), len(input_masks), len(label), len(char_ids), len(start_ids), len(end_ids))
-    # print(len(input_ids), len(input_types), len(input_masks), len(label), len(char_ids), len(start_ids), len(end_ids))
-    # input_ids = input_ids[:min_length]
-    # input_types = input_types[:min_length]
-    # input_masks = input_masks[:min_length]
-    # label = label[:min_length]
-    # char_ids = char_ids[:min_length]
-    # start_ids = start_ids[:min_length]
-    # end_ids = end_ids[:min_length]
-    
-    # Load data into efficient DataLoaders
-    BATCH_SIZE = 8
-    if IS_CHARBERT:
-        test_data = TensorDataset(torch.tensor(input_ids).to(DEVICE),
-                                torch.tensor(input_types).to(DEVICE),
-                                torch.tensor(input_masks).to(DEVICE),
-                                torch.tensor(char_ids).to(DEVICE),
-                                torch.tensor(start_ids).to(DEVICE),
-                                torch.tensor(end_ids).to(DEVICE),
-                                torch.tensor(label).to(DEVICE))
+        test_data_file = "Data/Multiple_dataset/kaggle_multi_base.pt"
+
+    if os.path.exists(test_data_file):
+        test_data = torch.load(test_data_file)
+        print("Test data loaded from file.")
     else:
-        test_data = TensorDataset(torch.tensor(input_ids).to(DEVICE),
-                                torch.tensor(input_types).to(DEVICE),
-                                torch.tensor(input_masks).to(DEVICE),
-                                torch.tensor(label).to(DEVICE))
+        if IS_CHARBERT:
+            char_ids, start_ids, end_ids = dataPreprocessFromCSV(dataset, input_ids, input_types, input_masks, label, IS_CHARBERT, True)
+        else:
+            dataPreprocessFromCSV(dataset, input_ids, input_types, input_masks, label, IS_CHARBERT, True)
+        print("load finish")
+        # Ensure all input arrays have the same length
+        # min_length = min(len(input_ids), len(input_types), len(input_masks), len(label), len(char_ids), len(start_ids), len(end_ids))
+        # print(len(input_ids), len(input_types), len(input_masks), len(label), len(char_ids), len(start_ids), len(end_ids))
+        # input_ids = input_ids[:min_length]
+        # input_types = input_types[:min_length]
+        # input_masks = input_masks[:min_length]
+        # label = label[:min_length]
+        # char_ids = char_ids[:min_length]
+        # start_ids = start_ids[:min_length]
+        # end_ids = end_ids[:min_length]
+        
+        # Load data into efficient DataLoaders
+        if IS_CHARBERT:
+            test_data = TensorDataset(torch.tensor(input_ids).to(DEVICE),
+                                    torch.tensor(input_types).to(DEVICE),
+                                    torch.tensor(input_masks).to(DEVICE),
+                                    torch.tensor(char_ids).to(DEVICE),
+                                    torch.tensor(start_ids).to(DEVICE),
+                                    torch.tensor(end_ids).to(DEVICE),
+                                    torch.tensor(label).to(DEVICE))
+        else:
+            test_data = TensorDataset(torch.tensor(input_ids).to(DEVICE),
+                                    torch.tensor(input_types).to(DEVICE),
+                                    torch.tensor(input_masks).to(DEVICE),
+                                    torch.tensor(label).to(DEVICE))
+        
+        # 保存到本地
+        torch.save(test_data, test_data_file)
     
     # Trim the dataset to be a multiple of BATCH_SIZE
     trim_length = (len(test_data) // BATCH_SIZE) * BATCH_SIZE
