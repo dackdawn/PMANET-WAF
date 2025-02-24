@@ -291,17 +291,19 @@ def load_char_to_ids_dict(char_vocab_file):
     return vocab
 
 
+# 移到外面来，这个加载过程耗时太长
+CharbertInput_bert_path = "charbert-bert-wiki/"
+CharbertInput_tokenizer = BertTokenizer(vocab_file=CharbertInput_bert_path + "vocab.txt")
+### 这里的字符级vocab不知道哪来的，所以随便生成了一个
+# Change back to use the vocab file in the charbert-bert-wiki
+# char_vocab_file = "./simple_vocab.txt"
+CharbertInput_char2ids_dict = load_char_to_ids_dict(char_vocab_file='charbert-bert-wiki/vocab.txt')
+
 def CharbertInput(context):
     """Create the additional input for CharBERT."""
-    bert_path = "charbert-bert-wiki/"
-    tokenizer = BertTokenizer(vocab_file=bert_path + "vocab.txt")
-    ### 这里的字符级vocab不知道哪来的，所以随便生成了一个
-    # Change back to use the vocab file in the charbert-bert-wiki
-    char_vocab_file = "./simple_vocab.txt"
-    char2ids_dict = load_char_to_ids_dict(char_vocab_file='charbert-bert-wiki/vocab.txt')
     max_length = 200
     char_maxlen = 200
-    token = tokenizer.convert_ids_to_tokens(context)
+    token = CharbertInput_tokenizer.convert_ids_to_tokens(context)
     token = " ".join(token)
     char_ids=[]
     start_ids=[]
@@ -319,10 +321,10 @@ def CharbertInput(context):
         if char_idx == len(token) - 1:
             end_ids.append(len(char_ids))
 
-        if c in char2ids_dict:
-            cid = char2ids_dict[c]
+        if c in CharbertInput_char2ids_dict:
+            cid = CharbertInput_char2ids_dict[c]
         else:
-            cid = char2ids_dict["[UNK]"]
+            cid = CharbertInput_char2ids_dict["[UNK]"]
         char_ids.append(cid)
     if len(char_ids) > char_maxlen:
         char_ids = char_ids[:char_maxlen]
