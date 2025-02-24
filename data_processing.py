@@ -112,7 +112,7 @@ def dataPreprocess_charbert(filename, input_ids, input_types, input_masks, char_
                 label.append([0])
 
 
-def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, is_CharBert=True):
+def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, is_CharBert=True, is_binary=True):
     """
     Preprocess data from a CSV file containing URLs and labels.
 
@@ -134,8 +134,8 @@ def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, 
     end_ids = []
     for i, row in tqdm(data.iterrows(), total=len(data)):
         # 注意这里裁剪成小数据集了
-        if i > 100:
-            break
+        # if i >= 1000:
+        #     break
         x1 = row['url']  # Replace with the column name in your CSV file where the text data is located
         x1 = tokenizer.tokenize(x1)
         tokens = ["[CLS]"] + x1 + ["[SEP]"]
@@ -165,13 +165,25 @@ def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, 
         assert len(ids) == len(masks) == len(types) == pad_size
 
         y = row['label']
-        if y == 'malicious':
-            label.append([1])
-        elif y == 'benign':
-            label.append([0])
-        # Make sure the length of all lists is the same
+
+        if is_binary:
+            if y == 'benign':
+                label.append([0])
+            else:
+                label.append([1])
         else:
-            raise ValueError(f"Unexpected label value: {y}")
+            
+            if y == 'benign':
+                label.append([0])
+            elif y == 'phishing':
+                label.append([1])
+            elif y == 'malware':
+                label.append([2])
+            elif y == 'spam':
+                label.append([3])
+            # Make sure the length of all lists is the same
+            else:
+                raise ValueError(f"Unexpected label value: {y}")
     if is_CharBert:
         return char_ids, start_ids, end_ids
 

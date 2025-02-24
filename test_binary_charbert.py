@@ -8,10 +8,11 @@ from sklearn.metrics import roc_curve, auc
 from data_processing import  dataPreprocessFromCSV
 from Model_PMA import Model, CharBertModel
 import numpy as np
+import time
 
 IS_CHARBERT = False
 
-def test_binary(model, device, test_loader):
+def test_binary(model, device, test_loader, output_name):
     """
     Perform binary classification testing using the given model.
 
@@ -25,7 +26,8 @@ def test_binary(model, device, test_loader):
     y_true = []
     y_pred = []
     y_probs = []  # Save predicted probabilities
-
+    
+    start_time = time.time()
     if IS_CHARBERT:
         for batch_idx, (x1, x2, x3, x4, x5, x6, y) in enumerate(test_loader):
             x1, x2, x3, x4, x5, x6, y = x1.to(device), x2.to(device), x3.to(device), x4.to(device), x5.to(device), x6.to(device), y.to(device)
@@ -36,16 +38,27 @@ def test_binary(model, device, test_loader):
             y_true.extend(y.cpu().numpy())
             y_pred.extend(pred.cpu().numpy())
             y_probs.extend(torch.softmax(y_, dim=1).cpu().numpy()[:, 1])  # Save predicted probabilities
+            if batch_idx % 100 == 0:
+                print(f'Batch {(batch_idx + 1) * len(x1)}/{len(test_loader.dataset)}, '
+                    f'{100. * batch_idx / len(test_loader):.2f}%, Loss: {test_loss:.4f}, '
+                    f'Time: {time.time() - start_time:.2f}s')
+                start_time = time.time()
     else:
         for batch_idx, (x1, x2, x3, y) in enumerate(test_loader):
             x1, x2, x3, y = x1.to(device), x2.to(device), x3.to(device), y.to(device)
             with torch.no_grad():
                 outputs, pooled, y_ = model([x1, x2, x3])
+            # print(f"y_: {y_.shape}, y: {y.shape}, size: {y.size()}")
             test_loss += F.cross_entropy(y_, y.squeeze().long()).item()
             pred = y_.max(-1, keepdim=True)[1]
             y_true.extend(y.cpu().numpy())
             y_pred.extend(pred.cpu().numpy())
             y_probs.extend(torch.softmax(y_, dim=1).cpu().numpy()[:, 1])  # Save predicted probabilities
+            if batch_idx % 100 == 0:
+                print(f'Batch {(batch_idx + 1) * len(x1)}/{len(test_loader.dataset)}, '
+                    f'{100. * batch_idx / len(test_loader):.2f}%, Loss: {test_loss:.4f}, '
+                    f'Time: {time.time() - start_time:.2f}s')
+                start_time = time.time()
 
     test_loss /= len(test_loader)
 
@@ -63,7 +76,7 @@ def test_binary(model, device, test_loader):
     plt.xlabel('Predicted')
     plt.ylabel('True')
     plt.title('Confusion Matrix')
-    plt.savefig('confusion_matrix.png')
+    plt.savefig(f'confusion_matrix_{output_name}.png')
 
     # Save the ROC curve plot
     fpr, tpr, _ = roc_curve(y_true, y_probs)
@@ -78,12 +91,12 @@ def test_binary(model, device, test_loader):
     plt.ylabel('True Positive Rate')
     plt.title('Receiver Operating Characteristic (ROC) Curve')
     plt.legend(loc='lower right')
-    plt.savefig('roc_curve.png')
+    plt.savefig(f'roc_curve_{output_name}.png')
 
     # Save predicted results, original results, and predicted probabilities to a txt file
     results_array = np.column_stack((y_true, y_pred, y_probs))
     header_text = "True label, Predicted label, Predicted Probability"
-    np.savetxt('results.txt', results_array, fmt='%1.6f', delimiter='\t', header=header_text)
+    np.savetxt(f'results_{output_name}.txt', results_array, fmt='%1.6f', delimiter='\t', header=header_text)
 
     print('Test set: Average loss: {:.4f}, Accuracy: {:.2f}%, Precision: {:.2f}%, Recall: {:.2f}%, F1: {:.2f}%'.format(
         test_loss, accuracy * 100, precision * 100, recall * 100, f1 * 100))
@@ -101,10 +114,11 @@ def main():
     end_ids = []  # end ids
     label = []  # Labels
 
+    dataset = "Data/Multiple_dataset/kaggle_multi.csv"
     if IS_CHARBERT:
-        char_ids, start_ids, end_ids = dataPreprocessFromCSV("Data/Kaggle_binary_dataset/kaggle_binary.csv", input_ids, input_types, input_masks, label, IS_CHARBERT)
+        char_ids, start_ids, end_ids = dataPreprocessFromCSV(dataset, input_ids, input_types, input_masks, label, IS_CHARBERT, True)
     else:
-        dataPreprocessFromCSV("Data/Kaggle_binary_dataset/kaggle_binary.csv", input_ids, input_types, input_masks, label, IS_CHARBERT)
+        dataPreprocessFromCSV(dataset, input_ids, input_types, input_masks, label, IS_CHARBERT, True)
     print("load finish")
     # Ensure all input arrays have the same length
     # min_length = min(len(input_ids), len(input_types), len(input_masks), len(label), len(char_ids), len(start_ids), len(end_ids))
@@ -136,15 +150,17 @@ def main():
     test_loader = DataLoader(test_data, sampler=test_sampler, batch_size=BATCH_SIZE)
     
     # Load the pre-trained model
+
+    model_name = "./model_epoch_1.pth"
+
     if IS_CHARBERT:
         model = CharBertModel().to(DEVICE)
-        model.load_state_dict(torch.load("./charbert_model.pth"))
     else:
         model = Model().to(DEVICE)
-        model.load_state_dict(torch.load("./bert_model.pth"))
 
+    model.load_state_dict(torch.load(model_name))
     # Test the model
-    accuracy, precision, recall, f1 = test_binary(model, DEVICE, test_loader)
+    accuracy, precision, recall, f1 = test_binary(model, DEVICE, test_loader, f'{model_name}_binary')
 
 if __name__ == '__main__':
     main()

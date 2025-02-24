@@ -88,7 +88,7 @@ def main():
     input_masks = []  # attention mask
     label = []  # Labels
 
-    dataPreprocessFromCSV("/dataset/multi_test.csv", input_ids, input_types, input_masks, label)  # 第一个参数是废弃的随便填
+    dataPreprocessFromCSV("Data/Kaggle_binary_dataset/kaggle_binary.csv", input_ids, input_types, input_masks, label)
     print("load finish")
     # Ensure all input arrays have the same length
     min_length = min(len(input_ids), len(input_types), len(input_masks), len(label))
