@@ -109,7 +109,7 @@ def dataPreprocess_charbert(filename, input_ids, input_types, input_masks, char_
             label.append([urltype])
 
 
-def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, is_CharBert=True, is_binary=True):
+def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, is_CharBert=True, class_to_id_dict=None):
     """
     Preprocess data from a CSV file containing URLs and labels.
 
@@ -119,8 +119,18 @@ def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, 
     :param input_types: List to store segment IDs.
     :param input_masks: List to store attention masks.
     :param label: List to store labels.
+    :param class_dict: Dictionary mapping class names to class IDs
     :return: None
     """
+    # 默认类别映射（如果未提供）
+    if class_to_id_dict is None:
+        class_to_id_dict = {
+            "benign": 0,
+            "malware": 1,
+            "phishing": 2,
+            "defacement": 3,
+            # 其他类别
+        }
     pad_size = 200
     bert_path = "charbert-bert-wiki/"
     tokenizer = BertTokenizer(vocab_file=bert_path + "vocab.txt") # Initialize the tokenizer
@@ -161,26 +171,13 @@ def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, 
             end_ids.append(end)
         assert len(ids) == len(masks) == len(types) == pad_size
 
-        y = row['label']
+        y = row['label'].lower()
 
-        if is_binary:
-            if y == 'benign':
-                label.append([0])
-            else:
-                label.append([1])
+        if y in class_to_id_dict:
+            label.append([class_to_id_dict[y]])
         else:
-            
-            if y == 'benign':
-                label.append([0])
-            elif y == 'phishing':
-                label.append([1])
-            elif y == 'malware':
-                label.append([2])
-            elif y == 'spam':
-                label.append([3])
-            # Make sure the length of all lists is the same
-            else:
-                raise ValueError(f"Unexpected label value: {y}")
+            raise ValueError(f"未知标签值: {y}，不在class_dict中")
+
     if is_CharBert:
         return char_ids, start_ids, end_ids
 

@@ -10,6 +10,8 @@ from data_processing import  dataPreprocessFromCSV
 from Model_PMA import Model, CharBertModel
 import numpy as np
 import time
+import pandas as pd
+from sklearn.metrics import classification_report
 
 IS_CHARBERT = False
 
@@ -17,7 +19,7 @@ IS_CHARBERT = False
 CLASSES_DICT = {
     0: {"name": "benign"},
     1: {"name": "malware"},
-    # 2: {"name": "phishing"},
+    2: {"name": "phishing"},
     # 3: {"name": "defacement"},
     # 可以根据需要添加更多类别
 }
@@ -80,43 +82,57 @@ def test_binary(model, device, test_loader, output_name):
     test_loss /= len(test_loader)
 
     accuracy = accuracy_score(y_true, y_pred)
-    precision = precision_score(y_true, y_pred)
-    recall = recall_score(y_true, y_pred)
-    f1 = f1_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, average='macro', zero_division=0)
+    recall = recall_score(y_true, y_pred, average='macro', zero_division=0)
+    f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
+
+    # 生成类别标签列表
+    class_labels = [CLASSES_DICT[i]["name"] for i in range(NUM_CLASSES)]
 
     cm = confusion_matrix(y_true, y_pred)
 
     # Save the confusion matrix plot
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=['benign', 'malware'],
-                yticklabels=['benign', 'malware'])
+    plt.figure(figsize=(max(8, NUM_CLASSES), max(6, NUM_CLASSES)))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", 
+                xticklabels=class_labels,
+                yticklabels=class_labels)
     plt.xlabel('Predicted')
     plt.ylabel('True')
     plt.title('Confusion Matrix')
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
     plt.savefig(f'confusion_matrix_{output_name}.png')
+    
+    # 保存详细的分类报告
+    report = classification_report(y_true, y_pred, target_names=class_labels, output_dict=True)
+    
+    # 将分类报告转换为可视化
+    plt.figure(figsize=(10, 7))
+    report_df = pd.DataFrame(report).T
+    sns.heatmap(report_df.iloc[:-3, :3].astype(float), annot=True, cmap="Blues")
+    plt.title("Classification Report Heatmap")
+    plt.tight_layout()
+    plt.savefig(f'classification_report_{output_name}.png')
 
-    # Save the ROC curve plot
-    fpr, tpr, _ = roc_curve(y_true, y_probs)
-    roc_auc = auc(fpr, tpr)
-
-    plt.figure()
-    plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % roc_auc)
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic (ROC) Curve')
-    plt.legend(loc='lower right')
-    plt.savefig(f'roc_curve_{output_name}.png')
-
-    # Save predicted results, original results, and predicted probabilities to a txt file
-    results_array = np.column_stack((y_true, y_pred, y_probs))
-    header_text = "True label, Predicted label, Predicted Probability"
-    np.savetxt(f'results_{output_name}.txt', results_array, fmt='%1.6f', delimiter='\t', header=header_text)
+    # 保存预测结果、原始结果和预测概率到文件
+    # 对于多分类，我们需要保存每个类的概率
+    y_probs_array = np.array(y_probs)
+    result_columns = ["True Label", "Predicted Label"]
+    for i in range(NUM_CLASSES):
+        result_columns.append(f"P({CLASSES_DICT[i]['name']})")
+    
+    results = np.column_stack([np.array(y_true), np.array(y_pred), y_probs_array])
+    
+    # 保存为CSV文件以便阅读
+    results_df = pd.DataFrame(results, columns=result_columns)
+    results_df.to_csv(f'results_{output_name}.csv', index=False)
 
     print('Test set: Average loss: {:.4f}, Accuracy: {:.2f}%, Precision: {:.2f}%, Recall: {:.2f}%, F1: {:.2f}%'.format(
         test_loss, accuracy * 100, precision * 100, recall * 100, f1 * 100))
+
+    # 打印详细的分类报告
+    print("\nClassification Report:")
+    print(classification_report(y_true, y_pred, target_names=class_labels))
 
     return accuracy, precision, recall, f1
 
