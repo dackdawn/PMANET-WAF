@@ -143,6 +143,15 @@ def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, 
         # 注意这里裁剪成小数据集了
         # if i >= 1000:
         #     break
+        
+        y = row['label'].lower()
+
+        if y in class_to_id_dict:
+            label.append([class_to_id_dict[y]])
+        else:
+            # continue
+            raise ValueError(f"未知标签值: {y}，不在class_dict中")
+
         x1 = row['url']  # Replace with the column name in your CSV file where the text data is located
         x1 = tokenizer.tokenize(x1)
         tokens = ["[CLS]"] + x1 + ["[SEP]"]
@@ -170,13 +179,6 @@ def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, 
             start_ids.append(start)
             end_ids.append(end)
         assert len(ids) == len(masks) == len(types) == pad_size
-
-        y = row['label'].lower()
-
-        if y in class_to_id_dict:
-            label.append([class_to_id_dict[y]])
-        else:
-            raise ValueError(f"未知标签值: {y}，不在class_dict中")
 
     if is_CharBert:
         return char_ids, start_ids, end_ids

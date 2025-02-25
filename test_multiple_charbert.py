@@ -13,7 +13,7 @@ import time
 import pandas as pd
 from sklearn.metrics import classification_report
 
-IS_CHARBERT = False
+IS_CHARBERT = True
 
 # 定义类别信息字典
 CLASSES_DICT = {
@@ -54,7 +54,7 @@ def test_binary(model, device, test_loader, output_name):
             pred = y_.max(-1, keepdim=True)[1]
             y_true.extend(y.cpu().numpy())
             y_pred.extend(pred.cpu().numpy())
-            y_probs.extend(torch.softmax(y_, dim=1).cpu().numpy()[:, 1])  # Save predicted probabilities
+            y_probs.extend(torch.softmax(y_, dim=1).cpu().numpy())  # Save predicted probabilities
             if i % 100 == 0:
                 print(f'Batch {(batch_idx + 1) * len(x1)}/{len(test_loader.dataset)}, '
                     f'{100. * batch_idx / len(test_loader):.2f}%, Loss: {test_loss:.4f}, '
@@ -72,7 +72,7 @@ def test_binary(model, device, test_loader, output_name):
             pred = y_.max(-1, keepdim=True)[1]
             y_true.extend(y.cpu().numpy())
             y_pred.extend(pred.cpu().numpy())
-            y_probs.extend(torch.softmax(y_, dim=1).cpu().numpy()[:, 1])  # Save predicted probabilities
+            y_probs.extend(torch.softmax(y_, dim=1).cpu().numpy())  # Save predicted probabilities
             if i % 100 == 0:
                 print(f'Batch {(batch_idx + 1) * len(x1)}/{len(test_loader.dataset)}, '
                     f'{100. * batch_idx / len(test_loader):.2f}%, Loss: {test_loss:.4f}, '
@@ -82,9 +82,9 @@ def test_binary(model, device, test_loader, output_name):
     test_loss /= len(test_loader)
 
     accuracy = accuracy_score(y_true, y_pred)
-    precision = precision_score(y_true, y_pred, average='macro', zero_division=0)
-    recall = recall_score(y_true, y_pred, average='macro', zero_division=0)
-    f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
+    precision = precision_score(y_true, y_pred, average='macro', zero_division=1)
+    recall = recall_score(y_true, y_pred, average='macro', zero_division=1)
+    f1 = f1_score(y_true, y_pred, average='macro', zero_division=1)
 
     # 生成类别标签列表
     class_labels = [CLASSES_DICT[i]["name"] for i in range(NUM_CLASSES)]
@@ -116,14 +116,21 @@ def test_binary(model, device, test_loader, output_name):
 
     # 保存预测结果、原始结果和预测概率到文件
     # 对于多分类，我们需要保存每个类的概率
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
     y_probs_array = np.array(y_probs)
-    result_columns = ["True Label", "Predicted Label"]
-    for i in range(NUM_CLASSES):
-        result_columns.append(f"P({CLASSES_DICT[i]['name']})")
-    
-    results = np.column_stack([np.array(y_true), np.array(y_pred), y_probs_array])
-    
-    # 保存为CSV文件以便阅读
+
+    # 创建结果数组
+    results = np.column_stack([
+        y_true,  # True Label
+        y_pred,  # Predicted Label
+        y_probs_array  # 预测概率 (所有类别)
+    ])
+
+    # 创建列名
+    result_columns = ["True Label", "Predicted Label"] + [f"P({CLASSES_DICT[i]['name']})" for i in range(NUM_CLASSES)]
+
+    # 保存为CSV文件
     results_df = pd.DataFrame(results, columns=result_columns)
     results_df.to_csv(f'results_{output_name}.csv', index=False)
 
@@ -202,10 +209,10 @@ def main():
     
     # Load the pre-trained model
 
-    model_name = "model_epoch_7.pth"
+    model_name = "charbert_model_epoch_1.pth"
 
     if IS_CHARBERT:
-        model = CharBertModel().to(DEVICE)
+        model = CharBertModel(num_classes=NUM_CLASSES).to(DEVICE)
     else:
         model = Model().to(DEVICE)
 

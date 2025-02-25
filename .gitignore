@@ -186,3 +186,5 @@ Data/**/*.pt
 *.pt
 log_want.txt
 phishing_urls*.txt
+classification_report_*.png
+results_*.csv
