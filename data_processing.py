@@ -106,10 +106,7 @@ def dataPreprocess_charbert(filename, input_ids, input_types, input_masks, char_
             end_ids.append(end)
             #         print(len(ids), len(masks), len(types))
             assert len(ids) == len(masks) == len(types) == pad_size
-            if urltype == 1:
-                label.append([1])
-            elif urltype == 0:
-                label.append([0])
+            label.append([urltype])
 
 
 def dataPreprocessFromCSV(filename, input_ids, input_types, input_masks, label, is_CharBert=True, is_binary=True):

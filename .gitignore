@@ -185,3 +185,4 @@ slurm/lzp-slurm-pmanet.sif
 Data/**/*.pt
 *.pt
 log_want.txt
+phishing_urls*.txt

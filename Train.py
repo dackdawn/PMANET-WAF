@@ -15,6 +15,15 @@ from Model_PMA import Model, CharBertModel
 # If IS_CHARBERT is True, use the CharBERT model; otherwise, use the BERT model
 IS_CHARBERT = True
 
+CLASS_DICT = {
+    0: {"name": "benign", "file": "benign_urls.txt"},
+    1: {"name": "malware", "file": "malware_urls.txt"},
+    2: {"name": "phishing", "file": "phishing_urls.txt"},
+    # 3: {"name": "defacement", "file": "defacement_urls.txt"},
+    # 可以根据需要添加更多类别
+}
+
+NUM_CLASSES = len(CLASS_DICT)
 
 log_stream = []
 
@@ -149,20 +158,27 @@ def validation(model, device, test_loader, epoch=0):
     test_loss /= len(test_loader)
 
     accuracy = accuracy_score(y_true, y_pred)
-    precision = precision_score(y_true, y_pred)
-    recall = recall_score(y_true, y_pred)
-    f1 = f1_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, average='macro', zero_division=0)
+    recall = recall_score(y_true, y_pred, average='macro', zero_division=0)
+    f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
+
+    # 使用CLASS_DICT生成类别标签列表
+    class_labels = [CLASS_DICT[i]["name"] for i in range(NUM_CLASSES)]
 
     cm = confusion_matrix(y_true, y_pred)
 
     # Plot the confusion matrix
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=['benign', 'malware'],
-                yticklabels=['benign', 'malware'])
+    plt.figure(figsize=(max(8, NUM_CLASSES), max(6, NUM_CLASSES)))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", 
+                xticklabels=class_labels,
+                yticklabels=class_labels)
     plt.xlabel('Predicted')
     plt.ylabel('True')
     plt.title('Confusion Matrix')
 
+    # 保存混淆矩阵并增加旋转标签以提高可读性
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
     # Save the confusion matrix plot
     plt.savefig(f'confusion_matrix-epoch{epoch}.png')
 
@@ -201,14 +217,28 @@ def main():
         start_ids = []
         end_ids = []
         if IS_CHARBERT:
-            dataPreprocess_charbert("benign_urls.txt", input_ids, input_types, input_masks, char_ids, start_ids, end_ids, label, 0)
-            dataPreprocess_charbert("malware_urls.txt", input_ids, input_types, input_masks, char_ids, start_ids, end_ids, label, 1)
+            # dataPreprocess_charbert("benign_urls.txt", input_ids, input_types, input_masks, char_ids, start_ids, end_ids, label, 0)
+            # dataPreprocess_charbert("malware_urls.txt", input_ids, input_types, input_masks, char_ids, start_ids, end_ids, label, 1)
+            for class_id, class_info in CLASS_DICT.items():
+                if os.path.exists(class_info["file"]):
+                    dataPreprocess_charbert(class_info["file"], input_ids, input_types, input_masks, 
+                                            char_ids, start_ids, end_ids, label, class_id)
+                else:
+                    print(f"Error: File {class_info['file']} for class {class_info['name']} not found!")
+                    exit()
+            print(label)
             input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val,char_ids_val,start_ids_val, end_ids_val, y_val = spiltDatast_charbert(
                     input_ids, input_types, input_masks,char_ids,start_ids ,end_ids,label)
             # print(input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val,char_ids_val,start_ids_val, end_ids_val, y_val)
         else:
-            dataPreprocess_bert("benign_urls.txt", input_ids, input_types, input_masks, label, 0)
-            dataPreprocess_bert("malware_urls.txt", input_ids, input_types, input_masks, label, 1)
+            # dataPreprocess_bert("benign_urls.txt", input_ids, input_types, input_masks, label, 0)
+            # dataPreprocess_bert("malware_urls.txt", input_ids, input_types, input_masks, label, 1)
+            for class_id, class_info in CLASS_DICT.items():
+                if os.path.exists(class_info["file"]):
+                    dataPreprocess_bert(class_info["file"], input_ids, input_types, input_masks, label, class_id)
+                else:
+                    print(f"Error: File {class_info['file']} for class {class_info['name']} not found!")
+                    exit()
             input_ids_train, input_types_train, input_masks_train, y_train, input_ids_val, input_types_val, input_masks_val, y_val = spiltDatast_bert(
                 input_ids, input_types, input_masks, label
             )
@@ -268,7 +298,7 @@ def main():
     val_loader = DataLoader(val_data, sampler=val_sampler, batch_size=BATCH_SIZE, drop_last=True)
     
     if IS_CHARBERT:
-        model = CharBertModel()
+        model = CharBertModel(num_classes=NUM_CLASSES)
     elif not IS_CHARBERT:
         model = Model()
     

@@ -14,7 +14,7 @@ class CharBertModel(nn.Module):
     Definition of the CharBertModel we defined to classify Malicious URLs
     """
 
-    def __init__(self):
+    def __init__(self, num_classes=2):
         super(CharBertModel, self).__init__()
         # 加载charbert
         config = BertConfig.from_pretrained('charbert-bert-wiki')
@@ -23,8 +23,9 @@ class CharBertModel(nn.Module):
         for param in self.bert.parameters():
             param.requires_grad = True
         
+        self.num_classes = num_classes  # 多分类问题的分类数
         self.dropout = nn.Dropout(p=0.1)  # Dropout 层用于防止过拟合
-        self.fc = nn.Linear(768, 2) # 全连接层用于二分类 (768 -> 2)
+        self.fc = nn.Linear(768, self.num_classes) # 全连接层用于二分类 (768 -> 2)
 
         # 1D卷积层用于特征融合
         self.hidden_size = 768
