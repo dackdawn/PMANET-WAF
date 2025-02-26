@@ -187,33 +187,53 @@ class SuperCharBertModel(nn.Module):
         # 7. 应用金字塔池化 - 使用softmax获取正规化的权重
         pooling_weights = F.softmax(self.pooling_weights, dim=0)
         
-        # 对每个池化配置应用池化
-        pooled_results = []
-        for i, weight in enumerate(pooling_weights):
-            if weight < 1e-3:  # 忽略权重很小的池化配置
-                continue
-                
-            # 应用当前池化配置
-            levels = self.pooling_configs[i]
-            pooled_features = []
-            
-            for level in levels:
-                # 计算每个级别的池化窗口大小
-                window_size = max(pos_pooled.size(1) // level, 1)
-                
-                # 使用平均池化
-                pooled = F.avg_pool2d(pos_pooled.permute(0, 3, 2, 1), (1, window_size)).permute(0, 3, 2, 1)
-                
-                # 添加池化结果
-                pooled_features.append(pooled)
-            
-            # 拼接当前配置的池化结果
-            if pooled_features:
-                concatenated = torch.cat(pooled_features, dim=1)
-                pooled_results.append(weight * concatenated)
+        # 获取第一个有效配置的结果作为基准大小
+        base_size = None
+        first_result = None
         
-        # 结合所有池化结果
-        concatenated_features = sum(pooled_results)
+        for i, weight in enumerate(pooling_weights):
+            if weight >= 1e-3:  # 找到第一个权重足够大的配置
+                levels = self.pooling_configs[i]
+                pooled_features = []
+                
+                for level in levels:
+                    window_size = max(pos_pooled.size(1) // level, 1)
+                    pooled = F.avg_pool2d(pos_pooled.permute(0, 3, 2, 1), 
+                                        (1, window_size)).permute(0, 3, 2, 1)
+                    pooled_features.append(pooled)
+                
+                if pooled_features:
+                    first_result = torch.cat(pooled_features, dim=1)
+                    base_size = first_result.size(1)  # 获取基准维度
+                    pooled_results = [weight * first_result]
+                    break
+        
+        # 处理其他配置
+        if base_size is not None:
+            for i, weight in enumerate(pooling_weights):
+                if weight < 1e-3 or i == pooled_results[0].size(1):  # 跳过已处理的配置
+                    continue
+                    
+                levels = self.pooling_configs[i]
+                pooled_features = []
+                
+                for level in levels:
+                    window_size = max(pos_pooled.size(1) // level, 1)
+                    pooled = F.avg_pool2d(pos_pooled.permute(0, 3, 2, 1), 
+                                        (1, window_size)).permute(0, 3, 2, 1)
+                    pooled_features.append(pooled)
+                
+                if pooled_features:
+                    result = torch.cat(pooled_features, dim=1)
+                    # 调整大小以匹配基准维度
+                    if result.size(1) != base_size:
+                        result = F.interpolate(result.permute(0, 3, 1, 2), 
+                                            size=(base_size, result.size(2)),
+                                            mode='nearest').permute(0, 2, 3, 1)
+                    pooled_results.append(weight * result)
+            
+            # 结合所有池化结果
+            concatenated_features = sum(pooled_results)
         
         # 8. 压缩特征
         compressed_feature_tensor = torch.mean(concatenated_features, dim=2)

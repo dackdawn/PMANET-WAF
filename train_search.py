@@ -12,8 +12,8 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {DEVICE}")
 
 # 超参数
-BATCH_SIZE = 16
-SEARCH_EPOCHS = 50
+BATCH_SIZE = 4
+SEARCH_EPOCHS = 10
 LEARNING_RATE = 2e-5
 ARCH_LEARNING_RATE = 3e-4
 WEIGHT_DECAY = 1e-4
@@ -24,7 +24,7 @@ NUM_CLASSES = 2
 CLASS_DICT = {
     0: {"name": "benign", "file": "benign_urls.txt"},
     1: {"name": "malware", "file": "malware_urls.txt"},
-    2: {"name": "phishing", "file": "phishing_urls.txt"},
+    # 2: {"name": "phishing", "file": "phishing_urls.txt"},
     # 3: {"name": "defacement", "file": "defacement_urls.txt"},
     # 可以根据需要添加更多类别
 }
@@ -37,11 +37,11 @@ def train_search(train_loader, valid_loader, model, architect, optimizer, epoch)
     for step, (train_batch, valid_batch) in enumerate(zip(train_loader, valid_loader)):
         # 训练批次数据
         train_inputs = [item.to(DEVICE) for item in train_batch[:-1]]
-        train_labels = train_batch[-1].to(DEVICE)
+        train_labels = train_batch[-1].to(DEVICE).squeeze().long()
         
         # 验证批次数据
         valid_inputs = [item.to(DEVICE) for item in valid_batch[:-1]]
-        valid_labels = valid_batch[-1].to(DEVICE)
+        valid_labels = valid_batch[-1].to(DEVICE).squeeze().long()
         
         # 1. 更新架构参数 (on validation data)
         architect.step(valid_inputs, valid_labels)
@@ -54,8 +54,8 @@ def train_search(train_loader, valid_loader, model, architect, optimizer, epoch)
         optimizer.step()
         
         if step % 50 == 0:
-            pred = logits.argmax(dim=1, keepdim=True)
-            correct = pred.eq(train_labels.view_as(pred)).sum().item()
+            pred = logits.argmax(dim=1)
+            correct = pred.eq(train_labels).sum().item()
             accuracy = correct / train_labels.size(0)
             
             print(f"Epoch: {epoch}, Step: {step}, Loss: {loss.item():.4f}, Acc: {accuracy:.4f}")
@@ -70,14 +70,14 @@ def validation(valid_loader, model, epoch):
     with torch.no_grad():
         for batch in valid_loader:
             inputs = [item.to(DEVICE) for item in batch[:-1]]
-            labels = batch[-1].to(DEVICE)
+            labels = batch[-1].to(DEVICE).squeeze().long()
             
             _, _, logits = model(inputs)
             loss = nn.CrossEntropyLoss()(logits, labels)
             
             val_loss += loss.item()
-            pred = logits.argmax(dim=1, keepdim=True)
-            correct += pred.eq(labels.view_as(pred)).sum().item()
+            pred = logits.argmax(dim=1)
+            correct += pred.eq(labels).sum().item()
             total += labels.size(0)
     
     accuracy = correct / total
@@ -137,44 +137,44 @@ def main():
                 exit()
         print(label)
 
-        # 加载训练数据集
-        if os.path.exists(f'train{base_data_file}'):
-            train_data = torch.load(f'train{base_data_file}')
-            print("train data loaded from file.")
-        else:
-            # Load data into efficient DataLoaders
-            train_data = TensorDataset(torch.tensor(input_ids_train).to(DEVICE),
-                                        torch.tensor(input_types_train).to(DEVICE),
-                                        torch.tensor(input_masks_train).to(DEVICE),
-                                        torch.tensor(char_ids_train).to(DEVICE),
-                                        torch.tensor(start_ids_train).to(DEVICE),
-                                        torch.tensor(end_ids_train).to(DEVICE),
-                                        torch.tensor(y_train).to(DEVICE))
+    # 加载训练数据集
+    if os.path.exists(f'train{base_data_file}'):
+        train_data = torch.load(f'train{base_data_file}')
+        print("train data loaded from file.")
+    else:
+        # Load data into efficient DataLoaders
+        train_data = TensorDataset(torch.tensor(input_ids_train).to(DEVICE),
+                                    torch.tensor(input_types_train).to(DEVICE),
+                                    torch.tensor(input_masks_train).to(DEVICE),
+                                    torch.tensor(char_ids_train).to(DEVICE),
+                                    torch.tensor(start_ids_train).to(DEVICE),
+                                    torch.tensor(end_ids_train).to(DEVICE),
+                                    torch.tensor(y_train).to(DEVICE))
 
-            # 保存到本地
-            torch.save(train_data, f'train{base_data_file}')
+        # 保存到本地
+        torch.save(train_data, f'train{base_data_file}')
         
-        train_sampler = RandomSampler(train_data)
-        train_loader = DataLoader(train_data, sampler=train_sampler, batch_size=BATCH_SIZE, drop_last=True)
+    train_sampler = RandomSampler(train_data)
+    train_loader = DataLoader(train_data, sampler=train_sampler, batch_size=BATCH_SIZE, drop_last=True)
 
-        # 加载测试数据集
-        if os.path.exists(f'val{base_data_file}'):
-            val_data = torch.load(f'val{base_data_file}')
-            print("val data loaded from file.")
-        else:
-            val_data = TensorDataset(torch.tensor(input_ids_val).to(DEVICE),
-                                        torch.tensor(input_types_val).to(DEVICE),
-                                        torch.tensor(input_masks_val).to(DEVICE),
-                                        torch.tensor(char_ids_val).to(DEVICE),
-                                        torch.tensor(start_ids_val).to(DEVICE),
-                                        torch.tensor(end_ids_val).to(DEVICE),
-                                        torch.tensor(y_val).to(DEVICE))
+    # 加载测试数据集
+    if os.path.exists(f'val{base_data_file}'):
+        val_data = torch.load(f'val{base_data_file}')
+        print("val data loaded from file.")
+    else:
+        val_data = TensorDataset(torch.tensor(input_ids_val).to(DEVICE),
+                                    torch.tensor(input_types_val).to(DEVICE),
+                                    torch.tensor(input_masks_val).to(DEVICE),
+                                    torch.tensor(char_ids_val).to(DEVICE),
+                                    torch.tensor(start_ids_val).to(DEVICE),
+                                    torch.tensor(end_ids_val).to(DEVICE),
+                                    torch.tensor(y_val).to(DEVICE))
+        
+        # 保存到本地
+        torch.save(val_data, f'val{base_data_file}')
             
-            # 保存到本地
-            torch.save(val_data, f'val{base_data_file}')
-            
-        val_sampler = SequentialSampler(val_data)
-        val_loader = DataLoader(val_data, sampler=val_sampler, batch_size=BATCH_SIZE, drop_last=True)
+    val_sampler = SequentialSampler(val_data)
+    val_loader = DataLoader(val_data, sampler=val_sampler, batch_size=BATCH_SIZE, drop_last=True)
 
     # 初始化超网模型
     model = SuperCharBertModel(num_classes=NUM_CLASSES).to(DEVICE)
@@ -216,10 +216,10 @@ def main():
         if val_acc > best_acc:
             best_acc = val_acc
             best_arch = {
-                'layer_weights': model.layer_weights.data.cpu().numpy().tolist(),
+                'layer_choice_weights': model.layer_choice_weights.data.cpu().numpy().tolist(),
                 'hidden_size_weights': model.hidden_size_weights.data.cpu().numpy().tolist(),
-                'attention_type_weights': model.attention_type_weights.data.cpu().numpy().tolist(),
-                'pyramid_level_weights': model.pyramid_level_weights.data.cpu().numpy().tolist()
+                'attention_weights': model.attention_weights.data.cpu().numpy().tolist(),
+                'pooling_weights': model.pooling_weights.data.cpu().numpy().tolist()
             }
             
             # 保存模型和架构参数
