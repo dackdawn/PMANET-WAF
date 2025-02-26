@@ -69,7 +69,7 @@ class CharBertModel(nn.Module):
             x = torch.cat([x1, x2], dim=-1)  # x torch.Size([16, 200, 768*2])  [batch_size, seq_len, 1536]
 
             # Reshape the tensor
-            x = x.view(x.size(0), -1, x.size(2))  # x torch.Size([16, 768*2, 200])  [batch_size, 768, seq_len]
+            x = x.view(x.size(0), -1, x.size(2))  # x torch.Size([16, 768*2, 200])  [batch_size, 768*2, seq_len]
 
             # Fuse with the convolutional layer
             y = self.fuse(x.transpose(1, 2))
