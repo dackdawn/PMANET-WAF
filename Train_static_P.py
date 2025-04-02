@@ -8,12 +8,13 @@ import seaborn as sns
 import time
 from data_processing import dataPreprocess_bert, spiltDatast_bert, dataPreprocess_charbert, spiltDatast_charbert
 from Model_PMA import Model, CharBertModel
+import numpy as np
 
 # batch_size设小
 # 显存内存共享
 
 # If IS_CHARBERT is True, use the CharBERT model; otherwise, use the BERT model
-IS_CHARBERT = True
+IS_CHARBERT = False
 
 CLASS_DICT = {
     0: {"name": "benign", "file": "benign_urls.txt"},
@@ -24,6 +25,13 @@ CLASS_DICT = {
 }
 
 NUM_CLASSES = len(CLASS_DICT)
+
+IMBALANCE_CONFIG = {
+    "pos_class": 1,  # 正类标签(malware)
+    "neg_class": 0,  # 负类标签(benign) 
+    "neg_pos_ratio": 3/1,  # 负正样本比例
+    "total_pos_samples": 1000  # 将在数据处理时设置
+}
 
 log_stream = []
 
@@ -187,8 +195,92 @@ def validation(model, device, test_loader, epoch=0):
     print(log_msg)
     write_log(log_msg)
 
+    # Print detailed confusion matrix information
+    print("\nConfusion Matrix Details:")
+    for i in range(NUM_CLASSES):
+        for j in range(NUM_CLASSES):
+            true_class = CLASS_DICT[i]["name"]
+            pred_class = CLASS_DICT[j]["name"]
+            count = cm[i, j]
+            print(f"True: {true_class}, Predicted: {pred_class}, Count: {count}")
+    
+    # Calculate per-class metrics
+    print("\nPer-class Metrics:")
+    for i in range(NUM_CLASSES):
+        class_name = CLASS_DICT[i]["name"]
+        true_positives = cm[i, i]
+        false_positives = cm[:, i].sum() - true_positives
+        false_negatives = cm[i, :].sum() - true_positives
+        true_negatives = cm.sum() - (true_positives + false_positives + false_negatives)
+        
+        class_precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
+        class_recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
+        class_f1 = 2 * class_precision * class_recall / (class_precision + class_recall) if (class_precision + class_recall) > 0 else 0
+        
+        print(f"Class: {class_name}")
+        print(f"  Precision: {class_precision:.4f}")
+        print(f"  Recall: {class_recall:.4f}")
+        print(f"  F1-score: {class_f1:.4f}")
+        print(f"  True Positives: {true_positives}")
+        print(f"  False Positives: {false_positives}")
+        print(f"  False Negatives: {false_negatives}")
+        print(f"  True Negatives: {true_negatives}")
+
     return accuracy, precision, recall, f1
 
+def balance_dataset(input_ids, input_types, input_masks, char_ids, start_ids, end_ids, labels):
+    """
+    根据固定的正例样本数量和比例平衡数据集
+    """
+    # 转换为numpy数组便于处理
+    labels = np.array(labels)
+    
+    # 获取正样本和负样本的索引
+    pos_indices = np.where(labels == IMBALANCE_CONFIG["pos_class"])[0]
+    neg_indices = np.where(labels == IMBALANCE_CONFIG["neg_class"])[0]
+    
+    # 如果现有正样本数量大于配置的数量，随机采样
+    if len(pos_indices) > IMBALANCE_CONFIG["total_pos_samples"]:
+        pos_indices = np.random.choice(pos_indices, IMBALANCE_CONFIG["total_pos_samples"], replace=False)
+    
+    # 根据比例计算需要的负样本数量
+    needed_neg_samples = int(IMBALANCE_CONFIG["total_pos_samples"] * IMBALANCE_CONFIG["neg_pos_ratio"])
+    
+    # 采样负样本
+    if len(neg_indices) > needed_neg_samples:
+        selected_neg_indices = np.random.choice(neg_indices, needed_neg_samples, replace=False)
+    else:
+        # 如果负样本不足,使用所有负样本
+        selected_neg_indices = neg_indices
+        print(f"Warning: Not enough negative samples. Needed {needed_neg_samples}, but only {len(neg_indices)} available.")
+    
+    # 合并正负样本索引
+    selected_indices = np.concatenate([pos_indices, selected_neg_indices])
+    
+    # 随机打乱索引
+    np.random.shuffle(selected_indices)
+    
+    # 根据选择的索引重构数据集
+    balanced_data = {
+        'input_ids': [input_ids[i] for i in selected_indices],
+        'input_types': [input_types[i] for i in selected_indices],
+        'input_masks': [input_masks[i] for i in selected_indices],
+        'labels': [labels[i] for i in selected_indices]
+    }
+    
+    if char_ids:
+        balanced_data.update({
+            'char_ids': [char_ids[i] for i in selected_indices],
+            'start_ids': [start_ids[i] for i in selected_indices],
+            'end_ids': [end_ids[i] for i in selected_indices]
+        })
+    
+    print(f"Dataset balanced - Total samples: {len(selected_indices)}")
+    print(f"Positive samples: {len(pos_indices)}")
+    print(f"Selected negative samples: {len(selected_neg_indices)}")
+    print(f"Actual ratio: {len(pos_indices)/len(selected_neg_indices):.3f}")
+    
+    return balanced_data
 
 def main():
     
@@ -226,9 +318,18 @@ def main():
                 else:
                     print(f"Error: File {class_info['file']} for class {class_info['name']} not found!")
                     exit()
+                    
+            # 添加数据平衡处理
+            balanced_data = balance_dataset(input_ids, input_types, input_masks, 
+                                         char_ids, start_ids, end_ids, label)
             print(label)
-            input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val,char_ids_val,start_ids_val, end_ids_val, y_val = spiltDatast_charbert(
-                    input_ids, input_types, input_masks,char_ids,start_ids ,end_ids,label)
+            # input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val,char_ids_val,start_ids_val, end_ids_val, y_val = spiltDatast_charbert(input_ids, input_types, input_masks,char_ids,start_ids ,end_ids,label)
+            input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, \
+            end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val, char_ids_val, \
+            start_ids_val, end_ids_val, y_val = spiltDatast_charbert(
+                balanced_data['input_ids'], balanced_data['input_types'], balanced_data['input_masks'],
+                balanced_data['char_ids'], balanced_data['start_ids'], balanced_data['end_ids'],
+                balanced_data['labels'])
             # print(input_ids_train, input_types_train, input_masks_train, char_ids_train, start_ids_train, end_ids_train, y_train, input_ids_val, input_types_val, input_masks_val,char_ids_val,start_ids_val, end_ids_val, y_val)
         else:
             # dataPreprocess_bert("benign_urls.txt", input_ids, input_types, input_masks, label, 0)
@@ -239,9 +340,19 @@ def main():
                 else:
                     print(f"Error: File {class_info['file']} for class {class_info['name']} not found!")
                     exit()
-            input_ids_train, input_types_train, input_masks_train, y_train, input_ids_val, input_types_val, input_masks_val, y_val = spiltDatast_bert(
-                input_ids, input_types, input_masks, label
-            )
+            # 添加数据平衡处理
+            balanced_data = balance_dataset(input_ids, input_types, input_masks, 
+                                         None, None, None, label)
+            
+            # input_ids_train, input_types_train, input_masks_train, y_train, input_ids_val, input_types_val, input_masks_val, y_val = spiltDatast_bert(
+            #     input_ids, input_types, input_masks, label
+            # )
+
+            # 使用平衡后的数据
+            input_ids_train, input_types_train, input_masks_train, y_train, input_ids_val, \
+            input_types_val, input_masks_val, y_val = spiltDatast_bert(
+                balanced_data['input_ids'], balanced_data['input_types'], 
+                balanced_data['input_masks'], balanced_data['labels'])
 
 
     # 加载训练数据集
@@ -312,7 +423,7 @@ def main():
     optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5, weight_decay=1e-4)
 
     best_acc = 0.0
-    NUM_EPOCHS = 3
+    NUM_EPOCHS = 2
     for epoch in range(1, NUM_EPOCHS + 1):  # 3 epochs
         train(model, DEVICE, train_loader, optimizer, epoch)
         acc, precision, recall, f1 = validation(model, DEVICE, val_loader, epoch)
@@ -320,9 +431,9 @@ def main():
             best_acc = acc
             
         if IS_CHARBERT:
-            PATH = f'./charbert_model_epoch_{epoch}.pth'
+            PATH = f'./charbert_model_staticP({IMBALANCE_CONFIG["neg_pos_ratio"]})_epoch_{epoch}.pth'
         else:
-            PATH = f'./bert_model_epoch_{epoch}.pth'
+            PATH = f'./bert_model_staticP({IMBALANCE_CONFIG["neg_pos_ratio"]})_epoch_{epoch}.pth'
         torch.save(model.state_dict(), PATH)  # Save the best model
         print("acc is: {:.4f}, best acc is {:.4f}n".format(acc, best_acc))
 

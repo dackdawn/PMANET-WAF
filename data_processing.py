@@ -226,7 +226,8 @@ def spiltDatast_charbert(input_ids, input_types, input_masks, char_ids, start_id
     """
     Split the dataset into training and testing sets.
 
-    :param end_ids: Charbert input    :param start_ids:
+    :param end_ids: Charbert input
+    :param start_ids:
     :param char_ids: Charbert input
     :param input_ids: List of input character IDs.
     :param input_types: List of segment IDs.
